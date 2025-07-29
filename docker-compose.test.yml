@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  db_test:
+    image: postgres:16-alpine
+    container_name: postgres_db_test
+    environment:
+      POSTGRES_DB: ${DB_NAME_TEST}
+      POSTGRES_USER: ${DB_USER_TEST}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_TEST}
+    ports:
+      - "5433:5432" # Porta diferente para não colidir com o serviço principal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER_TEST} -d ${DB_NAME_TEST}"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+
+  app_test:
+    build:
+      context: ../.. # Vai para a raiz do projeto para construir
+      dockerfile: Dockerfile
+    container_name: go_tokenization_backend_test
+    environment:
+      DB_HOST: db_test
+      DB_PORT: 5432 # Internamente no docker-compose, a porta é 5432
+      DB_USER: ${DB_USER_TEST}
+      DB_PASSWORD: ${DB_PASSWORD_TEST}
+      DB_NAME: ${DB_NAME_TEST}
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL_TEST} # Pode ser um mock RPC para testes reais
+      SOLANA_FEE_PAYER_PRIVATE_KEY: ${SOLANA_FEE_PAYER_PRIVATE_KEY_TEST}
+    depends_on:
+      db_test:
+        condition: service_healthy
+    command: ["./main"] # Inicia a aplicação normalmente

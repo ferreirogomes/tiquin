@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data # Persiste os dados do DB
+    healthcheck: # Garante que o DB esteja pronto antes que o backend inicie
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: go_tokenization_backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL}
+      SOLANA_FEE_PAYER_PRIVATE_KEY: ${SOLANA_FEE_PAYER_PRIVATE_KEY}
+    depends_on:
+      db:
+        condition: service_healthy # Garante que o DB esteja "healthy" antes de iniciar a aplicação
+    volumes:
+      - .:/app # Monta o diretório atual no container para desenvolvimento (opcional para produção)
+
+volumes:
+  db_data:
