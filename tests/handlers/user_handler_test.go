@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock" // Para mocks
 
-	"tiquin/handlers"
-	"tiquin/models"
-	"tiquin/services"
+	"github.com/ferreirogomes/tiquin/handlers"
+	"github.com/ferreirogomes/tiquin/models"
+	"github.com/ferreirogomes/tiquin/services"
 )
 
 // MockDB é uma implementação mock do storage.DB para testes de unidade

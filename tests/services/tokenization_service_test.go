@@ -3,8 +3,8 @@ package services_test
 import (
 	"testing"
 
-	"tiquin/models"
-	"tiquin/services"
+	"github.com/ferreirogomes/tiquin/models"
+	"github.com/ferreirogomes/tiquin/services"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/assert"

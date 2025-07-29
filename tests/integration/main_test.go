@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tiquin/models"
-	"tiquin/storage" // Para acessar o DB para limpeza
+	"github.com/ferreirogomestiquin/models"
+	"github.com/ferreirogomestiquin/storage" // Para acessar o DB para limpeza
 )
 
 const (
