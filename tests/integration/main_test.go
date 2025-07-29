@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ferreirogomes/tiquin/handlers"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/your-username/tokenization-backend/handlers"
 
 	"tiquin/models"
 	"tiquin/storage" // Para acessar o DB para limpeza
