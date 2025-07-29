@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"time"
 
-	"tokenization-backend/models"
-	"tokenization-backend/storage"
+	"github.com/ferreirogomes/tiquin/models"
+	"github.com/ferreirogomes/tiquin/storage"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"

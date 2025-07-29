@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"tiquin/models"
+	"github.com/ferreirogomes/tiquin/models"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"

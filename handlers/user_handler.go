@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"tiquin/data"
-	"tiquin/models"
+	"github.com/ferreirogomes/tiquin/models"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

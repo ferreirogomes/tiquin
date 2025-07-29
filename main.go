@@ -5,10 +5,10 @@ import (
 	"log"
 	"net/http"
 
-	"tiquin/blockchain_listener" // Importar o listener
-	"tiquin/handlers"
-	"tiquin/services"
-	"tiquin/storage"
+	"github.com/ferreirogomes/tiquin/blockchain_listener" // Importar o listener
+	"github.com/ferreirogomes/tiquin/handlers"
+	"github.com/ferreirogomes/tiquin/services"
+	"github.com/ferreirogomes/tiquin/storage"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"

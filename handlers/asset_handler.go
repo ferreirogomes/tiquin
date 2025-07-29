@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"tiquin/services"
+	"github.com/ferreirogomes/tiquin/services"
 
 	"github.com/go-chi/chi/v5"
 )

@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"tiquin/models"
+	"github.com/ferreirogomes/tiquin/models"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
