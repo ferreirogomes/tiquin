@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"tokenization-backend/models"
+	"tiquin/models"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"

@@ -5,10 +5,10 @@ import (
 	"log"
 	"net/http"
 
-	"tokenization-backend/blockchain_listener" // Importar o listener
-	"tokenization-backend/handlers"
-	"tokenization-backend/services"
-	"tokenization-backend/storage"
+	"tiquin/blockchain_listener" // Importar o listener
+	"tiquin/handlers"
+	"tiquin/services"
+	"tiquin/storage"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"

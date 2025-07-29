@@ -3,20 +3,23 @@ package integration_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/token"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/your-username/tokenization-backend/handlers"
 
-	"tokenization-backend/models"
-	"tokenization-backend/storage" // Para acessar o DB para limpeza
+	"tiquin/models"
+	"tiquin/storage" // Para acessar o DB para limpeza
 )
 
 const (

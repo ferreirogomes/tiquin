@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock" // Para mocks
 
-	"tokenization-backend/handlers"
-	"tokenization-backend/models"
-	"tokenization-backend/services"
-	"tokenization-backend/storage"
+	"tiquin/handlers"
+	"tiquin/models"
+	"tiquin/services"
 )
 
 // MockDB é uma implementação mock do storage.DB para testes de unidade

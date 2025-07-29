@@ -5,7 +5,7 @@ import (
 	"fmt" // Para fmt.Errorf
 	"net/http"
 
-	"tokenization-backend/services"
+	"tiquin/services"
 
 	"github.com/gagliardetto/solana-go" // Para PublicKey
 )

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"tokenization-backend/data"
-	"tokenization-backend/models"
+	"tiquin/data"
+	"tiquin/models"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

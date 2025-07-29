@@ -3,8 +3,8 @@ package services_test
 import (
 	"testing"
 
-	"tokenization-backend/models"
-	"tokenization-backend/services"
+	"tiquin/models"
+	"tiquin/services"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/assert"

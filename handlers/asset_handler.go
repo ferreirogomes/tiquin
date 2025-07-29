@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"tokenization-backend/services"
+	"tiquin/services"
 
 	"github.com/go-chi/chi/v5"
 )

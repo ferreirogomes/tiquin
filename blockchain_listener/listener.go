@@ -2,15 +2,18 @@ package blockchain_listener
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"math/big"
 	"time"
+
+	"tokenization-backend/models"
+	"tokenization-backend/storage"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws" // Para WebSockets
-	"tokenization-backend/models"
-	"tokenization-backend/storage"
 )
 
 // BlockchainListener escuta por eventos na Solana para manter o DB sincronizado.
@@ -219,7 +222,7 @@ func (l *BlockchainListener) handleTransfer(signature solana.Signature, info int
 			return
 		}
 	}
-	
+
 	// Para uma transferência, precisaríamos identificar o MintAddress do token transferido.
 	// Isso pode ser obtido buscando a conta 'source' ou 'destination' e vendo seu 'mint'.
 	// Para simplificar, vamos assumir que a informação do mint está disponível via a conta de token.
@@ -250,7 +253,7 @@ func (l *BlockchainListener) handleTransfer(signature solana.Signature, info int
 	// Identificar remetente e destinatário no nosso DB
 	// Isso é um pouco complexo, pois GetTokenAccountsByOwner retorna ATAs, não diretamente usuários.
 	// A melhor forma é buscar o owner da ATA na própria Solana, e então mapear para nosso DB.
-	fromOwnerPubKey := infoMap["authority"].(string) // Quem assinou a transação de transferência
+	fromOwnerPubKey := infoMap["authority"].(string)      // Quem assinou a transação de transferência
 	toOwnerPubKey := infoMap["destinationOwner"].(string) // Quem é o owner da conta de destino
 
 	fromUser, foundFromUser, err := l.DB.GetUserBySolanaPubKey(fromOwnerPubKey)
@@ -321,6 +324,6 @@ func parseAmountFromString(s string) (float64, error) {
 // ... Outras funções auxiliares se necessário ...
 
 // Para o parserAmountFromString
-import (
-    "math/big"
-)
+//import (
+//    "math/big"
+//)

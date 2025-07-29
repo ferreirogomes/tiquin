@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"tokenization-backend/models"
+	"tiquin/models"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
