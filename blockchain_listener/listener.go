@@ -18,19 +18,15 @@ import (
 
 // BlockchainListener escuta por eventos na Solana para manter o DB sincronizado.
 type BlockchainListener struct {
-	RPCClient  *rpc.Client
-	WSClient   *ws.Client // Cliente WebSocket para subscrições
-	DB         *storage.DB
-	FeePayerPK solana.PrivateKey // Chave do Fee Payer para identificar transações relevantes
+	RPCClient   *rpc.Client
+	RPCEndpoint string
+	DB          *storage.DB
+	FeePayerPK  solana.PrivateKey // Chave do Fee Payer para identificar transações relevantes
 }
 
 // NewBlockchainListener cria uma nova instância do listener.
 func NewBlockchainListener(rpcEndpoint string, db *storage.DB, feePayerKeyBase58 string) *BlockchainListener {
 	rpcClient := rpc.New(rpcEndpoint)
-	wsClient, err := ws.Connect(context.Background(), rpcEndpoint) // Assume ws:// ou wss://
-	if err != nil {
-		log.Fatalf("Falha ao conectar ao WebSocket Solana: %v", err)
-	}
 
 	feePayer, err := solana.PrivateKeyFromBase58(feePayerKeyBase58)
 	if err != nil {
@@ -38,10 +34,10 @@ func NewBlockchainListener(rpcEndpoint string, db *storage.DB, feePayerKeyBase58
 	}
 
 	return &BlockchainListener{
-		RPCClient:  rpcClient,
-		WSClient:   wsClient,
-		DB:         db,
-		FeePayerPK: feePayer,
+		RPCClient:   rpcClient,
+		RPCEndpoint: rpcEndpoint,
+		DB:          db,
+		FeePayerPK:  feePayer,
 	}
 }
 
@@ -49,24 +45,42 @@ func NewBlockchainListener(rpcEndpoint string, db *storage.DB, feePayerKeyBase58
 func (l *BlockchainListener) StartListening() {
 	log.Println("Iniciando listener da blockchain...")
 
+	for {
+		err := l.listenLoop()
+		if err != nil {
+			log.Printf("Listener desconectado ou erro: %v. Tentando reconectar em 5 segundos...", err)
+			time.Sleep(5 * time.Second)
+		}
+	}
+}
+
+func (l *BlockchainListener) listenLoop() error {
+	// 1. Conectar WebSocket
+	wsClient, err := ws.Connect(context.Background(), l.RPCEndpoint)
+	if err != nil {
+		return fmt.Errorf("falha ao conectar WebSocket: %w", err)
+	}
+	defer wsClient.Close()
+
+	// 2. Backfill: Processar transações recentes que podem ter sido perdidas
+	l.backfillTransactions()
+
 	// Exemplo: Subscrever a transações que envolvem o FeePayer (que cria Mints e assina transações)
 	// Em um sistema real, você subscreveria a contas de tokens específicas ou a todos os Mints conhecidos.
-	sub, err := l.WSClient.SignatureSubscribe(
+	sub, err := wsClient.SignatureSubscribe(
 		l.FeePayerPK.PublicKey(),
 		rpc.CommitmentFinalized,
 	)
 	if err != nil {
-		log.Printf("Falha ao subscrever a assinaturas: %v", err)
-		return
+		return fmt.Errorf("falha ao subscrever a assinaturas: %w", err)
 	}
 	defer sub.Unsubscribe()
 
+	log.Println("Escutando por novas transações...")
 	for {
 		got, err := sub.Recv()
 		if err != nil {
-			log.Printf("Erro ao receber assinatura: %v", err)
-			time.Sleep(5 * time.Second) // Espera antes de tentar novamente
-			continue
+			return fmt.Errorf("erro ao receber assinatura: %w", err)
 		}
 
 		// Apenas processa se a transação for confirmada e bem-sucedida
@@ -75,6 +89,30 @@ func (l *BlockchainListener) StartListening() {
 			l.ProcessTransaction(got.Value.Signature)
 		} else if got.Value.Err != nil {
 			log.Printf("Transação %s falhou: %v", got.Value.Signature, got.Value.Err)
+		}
+	}
+	return nil
+}
+
+// backfillTransactions busca as últimas transações para garantir que nada foi perdido.
+func (l *BlockchainListener) backfillTransactions() {
+	log.Println("Executando backfill de transações...")
+	limit := 50 // Buscar as últimas 50 transações
+	signatures, err := l.RPCClient.GetSignaturesForAddressWithOpts(
+		context.Background(),
+		l.FeePayerPK.PublicKey(),
+		&rpc.GetSignaturesForAddressOpts{Limit: &limit, Commitment: rpc.CommitmentFinalized},
+	)
+	if err != nil {
+		log.Printf("Erro ao buscar histórico de transações para backfill: %v", err)
+		return
+	}
+
+	// Processar do mais antigo para o mais novo para manter a ordem cronológica
+	for i := len(signatures) - 1; i >= 0; i-- {
+		sig := signatures[i]
+		if sig.Err == nil {
+			l.ProcessTransaction(sig.Signature)
 		}
 	}
 }
@@ -171,6 +209,17 @@ func (l *BlockchainListener) handleMintTo(signature solana.Signature, info inter
 		// Você pode decidir criar um registro para usuários externos ou ignorar.
 		// Por simplicidade, vamos pular se o usuário não for interno.
 		return
+	}
+
+	// Idempotência: Verificar se já processamos esta transação para este usuário
+	existingTokens, err := l.DB.GetTokensByOwnerID(ownerUser.ID)
+	if err == nil {
+		for _, t := range existingTokens {
+			if t.TransactionID == signature.String() {
+				log.Printf("Transação %s já processada para MintTo. Ignorando.", signature.String())
+				return
+			}
+		}
 	}
 
 	// Criar ou atualizar o registro de token para refletir o cunho
@@ -271,6 +320,17 @@ func (l *BlockchainListener) handleTransfer(signature solana.Signature, info int
 		log.Printf("Remetente ou destinatário (ou ambos) não encontrados no DB interno para TxID %s. De %s para %s. Ignorando.",
 			signature.String(), fromOwnerPubKey, toOwnerPubKey)
 		return
+	}
+
+	// Idempotência: Verificar se já processamos esta transação para o destinatário
+	existingTokens, err := l.DB.GetTokensByOwnerID(toUser.ID)
+	if err == nil {
+		for _, t := range existingTokens {
+			if t.TransactionID == signature.String() {
+				log.Printf("Transação %s já processada para Transfer. Ignorando.", signature.String())
+				return
+			}
+		}
 	}
 
 	// Agora que identificamos os usuários internos, podemos atualizar o banco de dados.

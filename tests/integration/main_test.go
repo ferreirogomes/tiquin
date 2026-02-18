@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ferreirogomestiquin/models"
-	"github.com/ferreirogomestiquin/storage" // Para acessar o DB para limpeza
+	"github.com/ferreirogomes/tiquin/models"
+	"github.com/ferreirogomes/tiquin/storage" // Para acessar o DB para limpeza
 )
 
 const (
@@ -248,10 +248,8 @@ func TestIntegration_CreateUserAndAssetAndTransfer(t *testing.T) {
 	fromATASol, _, _ := solana.FindAssociatedTokenAddress(fromUserPubKeySol, mintAddressSol)
 	toATASol, _, _ := solana.FindAssociatedTokenAddress(toUserPubKeySol, mintAddressSol)
 
-	recentBlockhashResp, err := testDB.RPCClient.GetRecentBlockhash(context.Background(), rpc.CommitmentFinalized) // Precisa de um rpc client aqui.
-	// Melhor mockar isso ou passar um serviço real para o teste se for usar RPC.
-	// Ou então, assuma que o backend já tem o blockhash.
-	// Para este teste, vamos mockar uma resposta de blockhash ou usar uma fixa.
+	// recentBlockhashResp, err := testDB.RPCClient.GetRecentBlockhash...
+	// REMOVED: Do not rely on internal service fields. Use a fresh RPC client for tests.
 	// Vou usar a que o prepareResp.SerializedTransaction já conteria.
 	// No entanto, para assinar novamente, precisamos de um blockhash válido.
 	// Vou pegar do RPC direto para o teste.
@@ -355,14 +353,3 @@ func TestIntegration_CreateUserAndAssetAndTransfer(t *testing.T) {
 	assert.NotNil(t, finalUser2GoogToken)
 	assert.InDelta(t, 50.0, finalUser2GoogToken.Amount, 0.000001)
 }
-
-// Pequena alteração no services/solana_integration_service.go para expor RPCClient para o TestMain
-// Isso é uma gambiarra para que o teste de integração possa usar o RPC client.
-// Em um sistema real, o RPCClient não seria exposto assim.
-/*
-type SolanaIntegrationService struct {
-	RPCClient *rpc.Client // Torne-o público para o teste
-	DB        *storage.DB
-	FeePayer  solana.PrivateKey
-}
-*/
