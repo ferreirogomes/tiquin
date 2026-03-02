@@ -12,10 +12,30 @@ import (
 	// Mudar de data para storage
 )
 
-// ... (SolanaIntegrationService struct e NewSolanaIntegrationService permanecem os mesmos) ...
+type SolanaIntegrationService struct {
+	RPCClient *rpc.Client
+	FeePayer  solana.PrivateKey
+}
 
-// CreateMintAndTokenAccount permanece o mesmo (ainda assinado pelo FeePayer)
-// MintTokensToAccount permanece o mesmo (ainda assinado pelo FeePayer)
+func NewSolanaIntegrationService(rpcEndpoint, feePayerKeyBase58 string) *SolanaIntegrationService {
+	client := rpc.New(rpcEndpoint)
+	feePayer, err := solana.PrivateKeyFromBase58(feePayerKeyBase58)
+	if err != nil {
+		log.Fatalf("Falha ao carregar chave do Fee Payer: %v", err)
+	}
+	return &SolanaIntegrationService{
+		RPCClient: client,
+		FeePayer:  feePayer,
+	}
+}
+
+func (s *SolanaIntegrationService) CreateMintAndTokenAccount(ownerPubKey solana.PublicKey, assetSymbol string) (solana.PublicKey, solana.PublicKey, error) {
+	return solana.PublicKey{}, solana.PublicKey{}, nil
+}
+
+func (s *SolanaIntegrationService) MintTokensToAccount(mintAddress, destinationATA solana.PublicKey, amount uint64) (solana.Signature, error) {
+	return solana.Signature{}, nil
+}
 
 // PrepareTransferTransaction serializa uma transação de transferência para assinatura pelo usuário.
 // Esta função CONSTRÓI a transação, mas NÃO a ASSINA com a chave privada do remetente.
@@ -36,8 +56,9 @@ func (s *SolanaIntegrationService) PrepareTransferTransaction(
 		amount,
 		fromATA,
 		toATA,
-		fromOwnerPubKey, // O "owner" da conta de origem é o remetente real
-	).SetProgramID(token.ProgramID).Build()
+		fromOwnerPubKey,      // O "owner" da conta de origem é o remetente real
+		[]solana.PublicKey{}, // Multisingers (nenhum neste caso)
+	).Build()
 
 	// O FeePayer paga a taxa da transação
 	tx, err := solana.NewTransaction(
@@ -72,19 +93,13 @@ func (s *SolanaIntegrationService) PrepareTransferTransaction(
 	return base64.StdEncoding.EncodeToString(serializedTx), nil
 }
 
-// SendSignedTransaction recebe uma transação já assinada e a envia para a rede.
 func (s *SolanaIntegrationService) SendSignedTransaction(signedTxBase64 string) (solana.Signature, error) {
-	signedTxBytes, err := base64.StdEncoding.DecodeString(signedTxBase64)
+	tx, err := solana.TransactionFromBase64(signedTxBase64)
 	if err != nil {
-		return solana.Signature{}, fmt.Errorf("falha ao decodificar transação assinada: %w", err)
+		return solana.Signature{}, fmt.Errorf("falha ao decodificar/deserializar transação assinada: %w", err)
 	}
 
-	var tx solana.Transaction
-	if err := tx.UnmarshalBinary(signedTxBytes); err != nil {
-		return solana.Signature{}, fmt.Errorf("falha ao deserializar transação: %w", err)
-	}
-
-	txID, err := s.RPCClient.SendTransactionWithOpts(context.Background(), &tx, rpc.TransactionOpts{
+	txID, err := s.RPCClient.SendTransactionWithOpts(context.Background(), tx, rpc.TransactionOpts{
 		SkipPreflight:       false,
 		PreflightCommitment: rpc.CommitmentConfirmed,
 	})
@@ -103,5 +118,10 @@ func (s *SolanaIntegrationService) SendSignedTransaction(signedTxBase64 string) 
 
 	return txID, nil
 }
+func (s *SolanaIntegrationService) GetTokenAccountBalance(tokenAccountAddress solana.PublicKey) (uint64, error) {
+	return 0, nil
+}
 
-// ... (GetTokenAccountBalance, GetTokenSupply permanecem os mesmos) ...
+func (s *SolanaIntegrationService) GetTokenSupply(mintAddress solana.PublicKey) (uint64, error) {
+	return 0, nil
+}

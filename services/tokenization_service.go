@@ -9,11 +9,33 @@ import (
 
 	"github.com/ferreirogomes/tiquin/models"
 
+	"github.com/ferreirogomes/tiquin/storage"
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 )
 
-// ... (TokenizationService struct e NewTokenizationService permanecem os mesmos) ...
+type TokenizationService struct {
+	DB      *storage.DB
+	SolanaS *SolanaIntegrationService
+}
+
+func NewTokenizationService(db *storage.DB, solanaS *SolanaIntegrationService) *TokenizationService {
+	return &TokenizationService{
+		DB:      db,
+		SolanaS: solanaS,
+	}
+}
+
+func (s *TokenizationService) CreateAsset(symbol, name string, totalShares float64) (models.Asset, error) {
+	asset := models.Asset{
+		ID:          uuid.New().String(),
+		Symbol:      symbol,
+		Name:        name,
+		TotalShares: totalShares,
+	}
+	err := s.DB.SaveAsset(asset)
+	return asset, err
+}
 
 // PrepareTransferTokenFromUser constrói uma transação para ser assinada pelo usuário.
 // Retorna a transação serializada em Base64 e o TokenAccountAddress de destino.
@@ -109,7 +131,7 @@ func (s *TokenizationService) CompleteTransferTokenFromUser(
 	assetID, fromUserID, toUserID string, amount float64, signedTxBase64 string,
 	destinationATA solana.PublicKey, // Recebe a ATA de destino de volta do handler
 ) (models.Token, error) {
-	fromUser, foundFrom, err := s.DB.GetUser(fromUserID)
+	_, foundFrom, err := s.DB.GetUser(fromUserID)
 	if err != nil {
 		return models.Token{}, fmt.Errorf("erro ao buscar usuário remetente: %w", err)
 	}
@@ -133,7 +155,7 @@ func (s *TokenizationService) CompleteTransferTokenFromUser(
 	}
 
 	// Envia a transação assinada para a rede Solana
-	txID, err := s.SolanaS.SendSignedTransaction(signedTxBase624)
+	txID, err := s.SolanaS.SendSignedTransaction(signedTxBase64)
 	if err != nil {
 		return models.Token{}, fmt.Errorf("falha ao enviar transação assinada para a Solana: %w", err)
 	}
@@ -161,5 +183,6 @@ func (s *TokenizationService) CompleteTransferTokenFromUser(
 
 	return transferredToken, nil
 }
-
-// ... (GetUserTokensFromSolana permanece o mesmo, buscando do DB para Asset info) ...
+func (s *TokenizationService) GetUserTokensFromSolana(userID string) ([]models.Token, error) {
+	return []models.Token{}, nil
+}

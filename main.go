@@ -33,10 +33,7 @@ func main() {
 	}
 	defer db.Close()
 
-	solanaIntegrationService, err := services.NewSolanaIntegrationService(solanaRPCURL, db, solanaFeePayerPrivateKey)
-	if err != nil {
-		log.Fatalf("Falha ao inicializar serviço Solana: %v", err)
-	}
+	solanaIntegrationService := services.NewSolanaIntegrationService(solanaRPCURL, solanaFeePayerPrivateKey)
 
 	tokenizationService := services.NewTokenizationService(db, solanaIntegrationService)
 

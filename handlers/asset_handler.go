@@ -53,7 +53,11 @@ func (h *AssetHandler) GetAssetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	asset, found := h.Service.DB.GetAsset(assetID)
+	asset, found, err := h.Service.DB.GetAsset(assetID)
+	if err != nil {
+		http.Error(w, "Erro ao buscar ativo", http.StatusInternalServerError)
+		return
+	}
 	if !found {
 		http.Error(w, "Ativo não encontrado", http.StatusNotFound)
 		return

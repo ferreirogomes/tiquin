@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/ferreirogomes/tiquin/services"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/gagliardetto/solana-go" // Para PublicKey
 )
@@ -93,6 +94,48 @@ func (h *TokenHandler) CompleteTransfer(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(token)
+}
+
+// GetTokenByID obtém um token pelo ID
+// GET /tokens/{id}
+func (h *TokenHandler) GetTokenByID(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "ID é obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	token, found, err := h.Service.DB.GetToken(id)
+	if err != nil {
+		http.Error(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "Token não encontrado", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(token)
+}
+
+// GetTokensByAssetID obtém todos os tokens de um determinado ativo
+// GET /tokens/by-asset/{assetID}
+func (h *TokenHandler) GetTokensByAssetID(w http.ResponseWriter, r *http.Request) {
+	assetID := chi.URLParam(r, "assetID")
+	if assetID == "" {
+		http.Error(w, "Asset ID é obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	tokens, err := h.Service.DB.GetTokensByAssetID(assetID)
+	if err != nil {
+		http.Error(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tokens)
 }
 
 // ... (GetTokenByID, GetTokensByAssetID permanecem os mesmos) ...
