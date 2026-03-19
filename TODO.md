@@ -15,8 +15,6 @@
    - Implementar regras de *compliance* e bloqueios programáticos nos contratos (ex: retenção de impostos, bloqueio de transferência para carteiras não verificadas).
    - Substituir processos discricionários por regras determinísticas baseadas em Smart Contracts/Tokens.
 
-5. **Participação na Rede ANBIMA de Inovação**
-   - Cadastrar o projeto Tiquin (como um caso de uso para tokenização fracionada em blockchain) na "Discovery IA" ou nas trilhas direcionadas ao mercado.
 
 ---
 ### Próximos Passos (Carteira Solana)
