@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ferreirogomes/tiquin/blockchain_listener" // Importar o listener
+	"github.com/ferreirogomes/tiquin/blockchain_listener" // Import the listener
 	"github.com/ferreirogomes/tiquin/handlers"
 	"github.com/ferreirogomes/tiquin/services"
 	"github.com/ferreirogomes/tiquin/storage"
@@ -25,11 +25,11 @@ func main() {
 	solanaRPCURL := os.Getenv("SOLANA_RPC_URL")
 	solanaFeePayerPrivateKey := os.Getenv("SOLANA_FEE_PAYER_PRIVATE_KEY")
 
-	// ... (Configuração DB e Solana como antes) ...
+	// ... (DB and Solana configuration as before) ...
 
 	db, err := storage.NewDB(dataSourceName)
 	if err != nil {
-		log.Fatalf("Falha fatal ao conectar ao banco de dados e aplicar migrações: %v", err)
+		log.Fatalf("Fatal error connecting to database and applying migrations: %v", err)
 	}
 	defer db.Close()
 
@@ -41,10 +41,10 @@ func main() {
 	tokenHandler := handlers.NewTokenHandler(tokenizationService)
 	userHandler := handlers.NewUserHandler(db, solanaIntegrationService, tokenizationService)
 
-	// Inicializa e inicia o listener da blockchain em uma goroutine separada
+	// Initialize and start the blockchain listener in a separate goroutine
 	listener := blockchain_listener.NewBlockchainListener(solanaRPCURL, db, solanaFeePayerPrivateKey)
 	go listener.StartListening()
-	log.Println("Listener da blockchain iniciado.")
+	log.Println("Blockchain listener started.")
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -57,8 +57,8 @@ func main() {
 	})
 
 	r.Route("/tokens", func(r chi.Router) {
-		r.Post("/transfer/prepare", tokenHandler.PrepareTransfer)   // Nova rota para preparar
-		r.Post("/transfer/complete", tokenHandler.CompleteTransfer) // Nova rota para completar
+		r.Post("/transfer/prepare", tokenHandler.PrepareTransfer)   // New route to prepare
+		r.Post("/transfer/complete", tokenHandler.CompleteTransfer) // New route to complete
 		r.Get("/{id}", tokenHandler.GetTokenByID)
 		r.Get("/by-asset/{assetID}", tokenHandler.GetTokensByAssetID)
 	})
@@ -97,7 +97,7 @@ func main() {
 		serverStopCtx()
 	}()
 
-	fmt.Printf("Servidor backend rodando na porta %s...\n", port)
+	fmt.Printf("Backend server running on port %s...\n", port)
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
@@ -105,5 +105,5 @@ func main() {
 
 	// Wait for server context to be stopped
 	<-serverCtx.Done()
-	log.Println("Servidor parado com sucesso.")
+	log.Println("Server stopped successfully.")
 }

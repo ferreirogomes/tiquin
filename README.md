@@ -1,76 +1,76 @@
 # Tiquin
-Uma solução para um bucadin de dinherim 
+A solution for a small money bucket
 
-# Backend de Tokenização de Ativos com Go e Solana
+# Asset Tokenization Backend with Go and Solana
 
-Este projeto é um backend de demonstração para tokenização de ativos (como ações fracionadas) na blockchain Solana, construído em Go. Ele utiliza PostgreSQL para persistência de dados internos, implementa um fluxo de assinatura de transações pelo usuário (com a chave privada ficando na carteira do usuário), e inclui um listener para eventos da blockchain para sincronização de dados. O projeto é dockerizado para facilitar a configuração e o desenvolvimento.
+This project is a demonstration backend for asset tokenization (such as fractional shares) on the Solana blockchain, built in Go. It uses PostgreSQL for internal data persistence, implements a user-signed transaction flow (with the private key remaining in the user's wallet), and includes a blockchain event listener for data synchronization. The project is dockerized to simplify setup and development.
 
-## Funcionalidades
+## Features
 
-* **Gerenciamento de Usuários:** Criação e consulta de usuários com suas chaves públicas Solana.
-* **Tokenização de Ativos:** Criação de novos ativos (ex: ações de empresas) que são representados por tokens SPL na Solana.
-* **Transferência de Tokens:** Fluxo de duas etapas onde o backend prepara a transação e o frontend (simulado nos testes) a assina com a chave privada do usuário.
-* **Listener da Blockchain:** Um serviço em segundo plano que escuta eventos na Solana para manter o banco de dados interno sincronizado com o estado on-chain dos tokens.
-* **Persistência de Dados:** Utiliza PostgreSQL para armazenar informações sobre usuários, ativos e tokens.
-* **Migrações de Banco de Dados:** Gerenciamento de schema com Flyway (via `sql-migrate`).
-* **Dockerização:** Ambiente de desenvolvimento e teste isolado com Docker Compose.
-* **Testes:** Testes de unidade e integração.
+* **User Management:** Creation and retrieval of users with their Solana public keys.
+* **Asset Tokenization:** Creation of new assets (e.g., company shares) represented as SPL tokens on Solana.
+* **Token Transfer:** A two-step flow where the backend prepares the transaction and the frontend (simulated in tests) signs it with the user's private key.
+* **Blockchain Listener:** A background service that listens for events on Solana to keep the internal database synchronized with the on-chain token state.
+* **Data Persistence:** Uses PostgreSQL to store information about users, assets, and tokens.
+* **Database Migrations:** Schema management with Flyway (via `sql-migrate`).
+* **Dockerization:** Isolated development and testing environment with Docker Compose.
+* **Tests:** Unit and integration tests.
 
-## Tecnologias Utilizadas
+## Technologies Used
 
-* **Go (Golang):** Linguagem de programação do backend.
-* **Solana:** Blockchain para a tokenização e registro de ativos.
-* **SPL Token Program:** Padrão de token fungível da Solana.
-* **`github.com/gagliardetto/solana-go`:** SDK Go para interagir com a Solana.
-* **PostgreSQL:** Banco de dados relacional.
-* **`github.com/jmoiron/sqlx`:** Extensão para o pacote `database/sql` para facilitar o mapeamento de structs.
-* **`github.com/lib/pq`:** Driver PostgreSQL para Go.
-* **`github.com/rubenv/sql-migrate`:** Gerenciador de migrações de banco de dados (padrão Flyway).
-* **`github.com/go-chi/chi`:** Roteador HTTP leve e modular para Go.
-* **`github.com/stretchr/testify`:** Toolkit de teste para Go.
-* **Docker & Docker Compose:** Para conteinerização e orquestração de serviços.
+* **Go (Golang):** Backend programming language.
+* **Solana:** Blockchain for asset tokenization and registration.
+* **SPL Token Program:** Solana's fungible token standard.
+* **`github.com/gagliardetto/solana-go`:** Go SDK for interacting with Solana.
+* **PostgreSQL:** Relational database.
+* **`github.com/jmoiron/sqlx`:** Extension for the `database/sql` package to simplify struct mapping.
+* **`github.com/lib/pq`:** PostgreSQL driver for Go.
+* **`github.com/rubenv/sql-migrate`:** Database migration manager (Flyway standard).
+* **`github.com/go-chi/chi`:** Lightweight and modular HTTP router for Go.
+* **`github.com/stretchr/testify`:** Testing toolkit for Go.
+* **Docker & Docker Compose:** For containerization and service orchestration.
 
-## Pré-requisitos
+## Prerequisites
 
-* [**Docker Desktop**](https://www.docker.com/products/docker-desktop) (ou Docker Engine e Docker Compose instalados)
-* [**Go**](https://golang.org/doc/install) (versão 1.22 ou superior)
-* **Solana CLI** (opcional, para gerar chaves de teste e fazer airdrop de SOL na devnet):
+* [**Docker Desktop**](https://www.docker.com/products/docker-desktop) (or Docker Engine and Docker Compose installed)
+* [**Go**](https://golang.org/doc/install) (version 1.22 or higher)
+* **Solana CLI** (optional, for generating test keys and airdropping SOL on devnet):
     `sh -c "$(curl -sSfL https://raw.githubusercontent.com/solana-labs/solana/master/install/install-init.sh)"`
 
-## Configuração do Ambiente
+## Environment Setup
 
-1.  **Clone o Repositório:**
+1.  **Clone the Repository:**
     ```bash
-    git clone [https://github.com/seu-usuario/tokenization-backend.git](https://github.com/seu-usuario/tokenization-backend.git)
+    git clone [https://github.com/your-username/tokenization-backend.git](https://github.com/your-username/tokenization-backend.git)
     cd tokenization-backend
     ```
 
-2.  **Crie e Configure o Arquivo `.env`:**
-    Na raiz do projeto, crie um arquivo chamado `.env` e preencha-o com suas configurações:
+2.  **Create and Configure the `.env` File:**
+    At the project root, create a file named `.env` and fill it with your configuration:
 
     ```ini
     DB_NAME=tokenizationdb
     DB_USER=user
     DB_PASSWORD=password
     SOLANA_RPC_URL=[https://api.devnet.solana.com](https://api.devnet.solana.com)
-    SOLANA_FEE_PAYER_PRIVATE_KEY=SUA_CHAVE_PRIVADA_BASE58_AQUI
+    SOLANA_FEE_PAYER_PRIVATE_KEY=YOUR_BASE58_PRIVATE_KEY_HERE
     ```
 
-    * `DB_NAME`, `DB_USER`, `DB_PASSWORD`: Credenciais para seu banco de dados PostgreSQL.
-    * `SOLANA_RPC_URL`: URL do endpoint RPC da Solana. Para desenvolvimento, `https://api.devnet.solana.com` é recomendado. Para produção, use um provedor RPC dedicado (QuickNode, Alchemy, Helius).
-    * `SOLANA_FEE_PAYER_PRIVATE_KEY`: **CRÍTICO!** Esta é a chave privada (em formato Base58) de uma carteira Solana que seu backend usará para pagar as taxas de gás (`SOL`) e agir como `Mint Authority` (quem pode cunhar novos tokens).
-        * **Para Testes:** Você pode gerar uma nova chave com a Solana CLI: `solana-keygen new --no-passphrase`. Após a criação, use `solana-keygen pubkey <path_to_your_keypair.json> --with-private-key` para obter a chave privada em Base58.
-        * **Financie a Carteira:** Envie alguns SOL para o endereço público dessa chave usando uma faucet da devnet (ex: `solana airdrop 10`).
-        * **SEGURANÇA:** **Nunca use uma chave privada real de produção diretamente em `.env`!** Para produção, utilize um serviço de gerenciamento de segredos (AWS Secrets Manager, HashiCorp Vault) ou um HSM.
+    * `DB_NAME`, `DB_USER`, `DB_PASSWORD`: Credentials for your PostgreSQL database.
+    * `SOLANA_RPC_URL`: URL for the Solana RPC endpoint. For development, `https://api.devnet.solana.com` is recommended. For production, use a dedicated RPC provider (QuickNode, Alchemy, Helius).
+    * `SOLANA_FEE_PAYER_PRIVATE_KEY`: **CRITICAL!** This is the private key (in Base58 format) of a Solana wallet that your backend will use to pay gas fees (`SOL`) and act as the `Mint Authority` (who can mint new tokens).
+        * **For Testing:** You can generate a new key with the Solana CLI: `solana-keygen new --no-passphrase`. After creation, use `solana-keygen pubkey <path_to_your_keypair.json> --with-private-key` to get the private key in Base58.
+        * **Fund the Wallet:** Send some SOL to the public address of this key using a devnet faucet (e.g., `solana airdrop 10`).
+        * **SECURITY:** **Never use a real production private key directly in `.env`!** For production, use a secrets management service (AWS Secrets Manager, HashiCorp Vault) or an HSM.
 
-3.  **Instale as Dependências Go:**
+3.  **Install Go Dependencies:**
     ```bash
     go mod tidy
     ```
 
-## Executando a Aplicação (Desenvolvimento)
+## Running the Application (Development)
 
-Para iniciar o backend e o PostgreSQL usando Docker Compose:
+To start the backend and PostgreSQL using Docker Compose:
 
 ```bash
 docker-compose up --build

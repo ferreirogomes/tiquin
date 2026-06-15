@@ -2,14 +2,14 @@ package models
 
 import "time"
 
-// Token representa uma unidade digital fracionada de uma ação.
+// Token represents a fractional digital unit of a share.
 type Token struct {
 	ID                  string    `json:"id"`
-	AssetID             string    `json:"asset_id"`             // ID da ação a qual este token pertence
-	OwnerID             string    `json:"owner_id"`             // ID do usuário que possui este token
-	Amount              float64   `json:"amount"`               // Fração da ação que este token representa (ex: 0.001 de uma ação)
-	SmartContractRules  string    `json:"smart_contract_rules"` // Simula regras do smart contract (ex: "direitos de voto", "dividendos")
-	IsTradable          bool      `json:"is_tradable"`          // Indica se o token pode ser negociado
+	AssetID             string    `json:"asset_id"`             // ID of the asset this token belongs to
+	OwnerID             string    `json:"owner_id"`             // ID of the user who owns this token
+	Amount              float64   `json:"amount"`               // Fraction of the asset this token represents (e.g., 0.001 of a share)
+	SmartContractRules  string    `json:"smart_contract_rules"` // Simulates smart contract rules (e.g., "voting rights", "dividends")
+	IsTradable          bool      `json:"is_tradable"`          // Indicates whether the token can be traded
 	MintAddress         string    `json:"mint_address"`
 	TokenAccountAddress string    `json:"token_account_address"`
 	TransactionID       string    `json:"transaction_id"`

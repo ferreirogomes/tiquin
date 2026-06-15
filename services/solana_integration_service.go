@@ -9,7 +9,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
-	// Mudar de data para storage
+	// Change from data to storage
 )
 
 type SolanaIntegrationService struct {
@@ -37,30 +37,30 @@ func (s *SolanaIntegrationService) MintTokensToAccount(mintAddress, destinationA
 	return solana.Signature{}, nil
 }
 
-// PrepareTransferTransaction serializa uma transação de transferência para assinatura pelo usuário.
-// Esta função CONSTRÓI a transação, mas NÃO a ASSINA com a chave privada do remetente.
-// O FeePayer paga as taxas de rede.
+// PrepareTransferTransaction serializes a transfer transaction for signing by the user.
+// This function BUILDS the transaction but does NOT SIGN it with the sender's private key.
+// The FeePayer pays the network fees.
 func (s *SolanaIntegrationService) PrepareTransferTransaction(
 	mintAddress, fromATA, toATA solana.PublicKey,
-	fromOwnerPubKey solana.PublicKey, // Public key do remetente real
+	fromOwnerPubKey solana.PublicKey, // Public key of the actual sender
 	amount uint64,
-) (string, error) { // Retorna a transação codificada em Base64
+) (string, error) { // Returns the transaction encoded in Base64
 	resp, err := s.RPCClient.GetRecentBlockhash(context.Background(), rpc.CommitmentFinalized)
 	if err != nil {
-		return "", fmt.Errorf("falha ao obter blockhash: %w", err)
+		return "", fmt.Errorf("failed to get blockhash: %w", err)
 	}
 	recentBlockhash := resp.Value.Blockhash
 
-	// Instrução para transferir tokens
+	// Instruction to transfer tokens
 	transferInstruction := token.NewTransferInstruction(
 		amount,
 		fromATA,
 		toATA,
-		fromOwnerPubKey,      // O "owner" da conta de origem é o remetente real
-		[]solana.PublicKey{}, // Multisingers (nenhum neste caso)
+		fromOwnerPubKey,      // The "owner" of the source account is the actual sender
+		[]solana.PublicKey{}, // Multisigners (none in this case)
 	).Build()
 
-	// O FeePayer paga a taxa da transação
+	// The FeePayer pays the transaction fee
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{
 			transferInstruction,
@@ -69,11 +69,11 @@ func (s *SolanaIntegrationService) PrepareTransferTransaction(
 		solana.TransactionPayer(s.FeePayer.PublicKey()),
 	)
 	if err != nil {
-		return "", fmt.Errorf("falha ao criar transação de transferência: %w", err)
+		return "", fmt.Errorf("failed to create transfer transaction: %w", err)
 	}
 
-	// O FeePayer PRECISA assinar, pois ele é o pagador da transação
-	// O fromOwnerPubKey (remetente) assinará no frontend
+	// The FeePayer MUST sign, as they are the transaction payer
+	// The fromOwnerPubKey (sender) will sign on the frontend
 	_, err = tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
 		if key.Equals(s.FeePayer.PublicKey()) {
 			return &s.FeePayer
@@ -81,13 +81,13 @@ func (s *SolanaIntegrationService) PrepareTransferTransaction(
 		return nil
 	})
 	if err != nil {
-		return "", fmt.Errorf("falha ao assinar transação pelo FeePayer: %w", err)
+		return "", fmt.Errorf("failed to sign transaction by FeePayer: %w", err)
 	}
 
-	// Serializar a transação para ser enviada ao cliente
+	// Serialize the transaction to be sent to the client
 	serializedTx, err := tx.MarshalBinary()
 	if err != nil {
-		return "", fmt.Errorf("falha ao serializar transação: %w", err)
+		return "", fmt.Errorf("failed to serialize transaction: %w", err)
 	}
 
 	return base64.StdEncoding.EncodeToString(serializedTx), nil
@@ -96,7 +96,7 @@ func (s *SolanaIntegrationService) PrepareTransferTransaction(
 func (s *SolanaIntegrationService) SendSignedTransaction(signedTxBase64 string) (solana.Signature, error) {
 	tx, err := solana.TransactionFromBase64(signedTxBase64)
 	if err != nil {
-		return solana.Signature{}, fmt.Errorf("falha ao decodificar/deserializar transação assinada: %w", err)
+		return solana.Signature{}, fmt.Errorf("failed to decode/deserialize signed transaction: %w", err)
 	}
 
 	txID, err := s.RPCClient.SendTransactionWithOpts(context.Background(), tx, rpc.TransactionOpts{
@@ -104,16 +104,16 @@ func (s *SolanaIntegrationService) SendSignedTransaction(signedTxBase64 string) 
 		PreflightCommitment: rpc.CommitmentConfirmed,
 	})
 	if err != nil {
-		return solana.Signature{}, fmt.Errorf("falha ao enviar transação assinada: %w", err)
+		return solana.Signature{}, fmt.Errorf("failed to send signed transaction: %w", err)
 	}
-	log.Printf("Transação assinada enviada: %s\n", txID)
+	log.Printf("Signed transaction sent: %s\n", txID)
 
-	// Aguardar confirmação (opcional, mas recomendado para operações críticas)
+	// Wait for confirmation (optional, but recommended for critical operations)
 	_, err = s.RPCClient.GetSignatureStatuses(context.Background(), true, txID)
 	if err != nil {
-		log.Printf("Erro ao verificar status da transação %s: %v\n", txID, err)
+		log.Printf("Error checking transaction status %s: %v\n", txID, err)
 	} else {
-		log.Printf("Transação %s confirmada.\n", txID)
+		log.Printf("Transaction %s confirmed.\n", txID)
 	}
 
 	return txID, nil

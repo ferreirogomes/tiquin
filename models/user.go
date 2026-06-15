@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// User representa um investidor ou titular de tokens.
+// User represents an investor or token holder.
 type User struct {
 	ID           string    `json:"id"`
 	Name         *string   `json:"name,omitempty"`

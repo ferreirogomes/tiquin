@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"database/sql" // Importar sql base
+	"database/sql" // Import base sql
 	"fmt"
 	"log"
 
@@ -9,48 +9,48 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	migrate "github.com/rubenv/sql-migrate" // Importar sql-migrate
+	migrate "github.com/rubenv/sql-migrate" // Import sql-migrate
 )
 
-// DB representa a conexão com o banco de dados PostgreSQL.
+// DB represents the PostgreSQL database connection.
 type DB struct {
 	*sqlx.DB
 }
 
-// NewDB conecta-se ao PostgreSQL e executa as migrações.
+// NewDB connects to PostgreSQL and runs migrations.
 func NewDB(dataSourceName string) (*DB, error) {
 	db, err := sqlx.Connect("postgres", dataSourceName)
 	if err != nil {
-		return nil, fmt.Errorf("falha ao conectar ao banco de dados: %w", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("falha ao pingar o banco de dados: %w", err)
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
-	log.Println("Conexão com PostgreSQL estabelecida com sucesso.")
+	log.Println("PostgreSQL connection established successfully.")
 
 	// Executar migrações
-	if err := runMigrations(db.DB); err != nil { // Passar *sql.DB
-		return nil, fmt.Errorf("falha ao executar migrações: %w", err)
+	if err := runMigrations(db.DB); err != nil { // Pass *sql.DB
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	return &DB{db}, nil
 }
 
-// runMigrations executa as migrações usando sql-migrate.
+// runMigrations runs the migrations using sql-migrate.
 func runMigrations(db *sql.DB) error {
 	migrations := &migrate.FileMigrationSource{
-		Dir: "./storage/migrations", // Caminho para as migrações SQL
+		Dir: "./storage/migrations", // Path to SQL migrations
 	}
 
 	n, err := migrate.Exec(db, "postgres", migrations, migrate.Up)
 	if err != nil {
-		return fmt.Errorf("erro ao aplicar migrações: %w", err)
+		return fmt.Errorf("error applying migrations: %w", err)
 	}
 	if n > 0 {
-		log.Printf("Aplicadas %d migrações ao banco de dados.", n)
+		log.Printf("Applied %d migration(s) to the database.", n)
 	} else {
-		log.Println("Nenhuma migração nova para aplicar.")
+		log.Println("No new migrations to apply.")
 	}
 	return nil
 }
@@ -150,7 +150,7 @@ func (d *DB) GetTokensByOwnerID(ownerID string) ([]models.Token, error) {
 	return tokens, err
 }
 
-// GetToken busca um token pelo ID
+// GetToken retrieves a token by ID
 func (d *DB) GetToken(id string) (models.Token, bool, error) {
 	var token models.Token
 	err := d.Get(&token, "SELECT * FROM tokens WHERE id = $1", id)
@@ -163,7 +163,7 @@ func (d *DB) GetToken(id string) (models.Token, bool, error) {
 	return token, true, nil
 }
 
-// GetTokensByAssetID busca tokens de um determinado ativo
+// GetTokensByAssetID retrieves tokens for a given asset
 func (d *DB) GetTokensByAssetID(assetID string) ([]models.Token, error) {
 	var tokens []models.Token
 	err := d.Select(&tokens, "SELECT * FROM tokens WHERE asset_id = $1", assetID)
@@ -189,7 +189,7 @@ func (d *DB) UpdateToken(token models.Token) error {
 	query := `UPDATE tokens SET amount = $1, owner_id = $2, transaction_id = $3 WHERE id = $4`
 	_, err := d.Exec(query, token.Amount, token.OwnerID, token.TransactionID, token.ID)
 	if err != nil {
-		return fmt.Errorf("falha ao atualizar token: %w", err)
+		return fmt.Errorf("failed to update token: %w", err)
 	}
 	return nil
 }

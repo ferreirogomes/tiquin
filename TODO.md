@@ -1,24 +1,24 @@
-# TODO: Adequação Tiquin ↔ ANBIMA (Rede de Inovação / Drex)
+# TODO: Tiquin ↔ ANBIMA Adaptation (Innovation Network / Drex)
 
-1. **Interoperabilidade (Solana ↔ EVM/Drex)**
-   - Expandir `blockchain_listener` para escutar eventos cross-chain ou interagir com bridges que conectem a Solana ao ambiente EVM (Hyperledger Besu) do Drex.
+1. **Interoperability (Solana ↔ EVM/Drex)**
+   - Expand `blockchain_listener` to listen for cross-chain events or interact with bridges connecting Solana to the EVM environment (Hyperledger Besu) of Drex.
 
-2. **Suporte Multi-chain / Compatibilidade EVM**
-   - Avaliar a abstração do módulo SPL Token para suportar padrões EVM (ERC-20, ERC-1155, ERC-3643).
-   - Permitir que os ativos originais possam ser liquidados (DvP) na infraestrutura do Drex se exigido pela regulação.
+2. **Multi-chain Support / EVM Compatibility**
+   - Evaluate abstracting the SPL Token module to support EVM standards (ERC-20, ERC-1155, ERC-3643).
+   - Allow original assets to be settled (DvP) on the Drex infrastructure if required by regulation.
 
-3. **Gestão de Identidade e Permissonamento (KYC/AML - Open Finance)**
-   - Incorporar uma camada de validação e identidade digital ao fluxo de criação de usuários.
-   - Garantir que as carteiras (wallets) participantes sejam autorizadas por instituições financeiras ou nós regulamentados.
+3. **Identity Management and Permissioning (KYC/AML - Open Finance)**
+   - Incorporate a digital identity validation layer into the user creation flow.
+   - Ensure that participating wallets are authorized by financial institutions or regulated nodes.
 
-4. **Programabilidade e Compliance On-Chain (CVM)**
-   - Implementar regras de *compliance* e bloqueios programáticos nos contratos (ex: retenção de impostos, bloqueio de transferência para carteiras não verificadas).
-   - Substituir processos discricionários por regras determinísticas baseadas em Smart Contracts/Tokens.
+4. **On-Chain Programmability and Compliance (CVM)**
+   - Implement compliance rules and programmatic restrictions in contracts (e.g., tax withholding, transfer block to unverified wallets).
+   - Replace discretionary processes with deterministic rules based on Smart Contracts/Tokens.
 
 
 ---
-### Próximos Passos (Carteira Solana)
-- [ ] Gerar carteira Solana para testes (`solana-keygen new`).
-- [ ] Obter chave privada base58.
-- [ ] Solicitar airdrop de devnet SOL.
-- [ ] Preencher as credenciais no arquivo local `.env_true`.
+### Next Steps (Solana Wallet)
+- [ ] Generate a Solana wallet for testing (`solana-keygen new`).
+- [ ] Obtain the Base58 private key.
+- [ ] Request a devnet SOL airdrop.
+- [ ] Fill in the credentials in the local `.env_true` file.

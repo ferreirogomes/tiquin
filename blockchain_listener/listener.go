@@ -12,24 +12,24 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/gagliardetto/solana-go/rpc/ws" // Para WebSockets
+	"github.com/gagliardetto/solana-go/rpc/ws" // For WebSockets
 )
 
-// BlockchainListener escuta por eventos na Solana para manter o DB sincronizado.
+// BlockchainListener listens for events on Solana to keep the DB synchronized.
 type BlockchainListener struct {
 	RPCClient   *rpc.Client
 	RPCEndpoint string
 	DB          *storage.DB
-	FeePayerPK  solana.PrivateKey // Chave do Fee Payer para identificar transações relevantes
+	FeePayerPK  solana.PrivateKey // Fee Payer key used to identify relevant transactions
 }
 
-// NewBlockchainListener cria uma nova instância do listener.
+// NewBlockchainListener creates a new listener instance.
 func NewBlockchainListener(rpcEndpoint string, db *storage.DB, feePayerKeyBase58 string) *BlockchainListener {
 	rpcClient := rpc.New(rpcEndpoint)
 
 	feePayer, err := solana.PrivateKeyFromBase58(feePayerKeyBase58)
 	if err != nil {
-		log.Fatalf("Falha ao carregar chave privada do Fee Payer para listener: %v", err)
+		log.Fatalf("Failed to load Fee Payer private key for listener: %v", err)
 	}
 
 	return &BlockchainListener{
@@ -40,73 +40,73 @@ func NewBlockchainListener(rpcEndpoint string, db *storage.DB, feePayerKeyBase58
 	}
 }
 
-// StartListening inicia a escuta por eventos.
+// StartListening starts listening for events.
 func (l *BlockchainListener) StartListening() {
-	log.Println("Iniciando listener da blockchain...")
+	log.Println("Starting blockchain listener...")
 
 	for {
 		err := l.listenLoop()
 		if err != nil {
-			log.Printf("Listener desconectado ou erro: %v. Tentando reconectar em 5 segundos...", err)
+			log.Printf("Listener disconnected or error: %v. Retrying in 5 seconds...", err)
 			time.Sleep(5 * time.Second)
 		}
 	}
 }
 
 func (l *BlockchainListener) listenLoop() error {
-	// 1. Conectar WebSocket
+	// 1. Connect WebSocket
 	wsClient, err := ws.Connect(context.Background(), l.RPCEndpoint)
 	if err != nil {
-		return fmt.Errorf("falha ao conectar WebSocket: %w", err)
+		return fmt.Errorf("failed to connect WebSocket: %w", err)
 	}
 	defer wsClient.Close()
 
-	// 2. Backfill: Processar transações recentes que podem ter sido perdidas
+	// 2. Backfill: Process recent transactions that may have been missed
 	l.backfillTransactions()
 
-	// Exemplo: Subscrever a transações que envolvem o FeePayer (que cria Mints e assina transações)
-	// Em um sistema real, você subscreveria a contas de tokens específicas ou a todos os Mints conhecidos.
+	// Example: Subscribe to transactions involving the FeePayer (who creates Mints and signs transactions)
+	// In a real system, you would subscribe to specific token accounts or all known Mints.
 	sub, err := wsClient.LogsSubscribeMentions(
 		l.FeePayerPK.PublicKey(),
 		rpc.CommitmentFinalized,
 	)
 	if err != nil {
-		return fmt.Errorf("falha ao subscrever a logs: %w", err)
+		return fmt.Errorf("failed to subscribe to logs: %w", err)
 	}
 	defer sub.Unsubscribe()
 
-	log.Println("Escutando por novas transações (logs)...")
+	log.Println("Listening for new transactions (logs)...")
 	for {
 		got, err := sub.Recv(context.Background())
 		if err != nil {
-			return fmt.Errorf("erro ao receber log: %w", err)
+			return fmt.Errorf("error receiving log: %w", err)
 		}
 
-		// Apenas processa se não houve erro relatado no log da transação
+		// Only process if no error was reported in the transaction log
 		if got.Value.Err == nil {
-			log.Printf("Transação com FeePayer detectada (Signature: %s). Processando...", got.Value.Signature)
+			log.Printf("Transaction with FeePayer detected (Signature: %s). Processing...", got.Value.Signature)
 			l.ProcessTransaction(got.Value.Signature)
 		} else {
-			log.Printf("Transação %s falhou no log: %v", got.Value.Signature, got.Value.Err)
+			log.Printf("Transaction %s failed in log: %v", got.Value.Signature, got.Value.Err)
 		}
 	}
 }
 
-// backfillTransactions busca as últimas transações para garantir que nada foi perdido.
+// backfillTransactions fetches recent transactions to ensure nothing was missed.
 func (l *BlockchainListener) backfillTransactions() {
-	log.Println("Executando backfill de transações...")
-	limit := 50 // Buscar as últimas 50 transações
+	log.Println("Running transaction backfill...")
+	limit := 50 // Fetch the last 50 transactions
 	signatures, err := l.RPCClient.GetSignaturesForAddressWithOpts(
 		context.Background(),
 		l.FeePayerPK.PublicKey(),
 		&rpc.GetSignaturesForAddressOpts{Limit: &limit, Commitment: rpc.CommitmentFinalized},
 	)
 	if err != nil {
-		log.Printf("Erro ao buscar histórico de transações para backfill: %v", err)
+		log.Printf("Error fetching transaction history for backfill: %v", err)
 		return
 	}
 
-	// Processar do mais antigo para o mais novo para manter a ordem cronológica
+	// Process from oldest to newest to maintain chronological order
 	for i := len(signatures) - 1; i >= 0; i-- {
 		sig := signatures[i]
 		if sig.Err == nil {
@@ -115,100 +115,100 @@ func (l *BlockchainListener) backfillTransactions() {
 	}
 }
 
-// ProcessTransaction busca os detalhes de uma transação e atualiza o DB.
+// ProcessTransaction fetches transaction details and updates the DB.
 func (l *BlockchainListener) ProcessTransaction(signature solana.Signature) {
-	log.Printf("Buscando detalhes da transação %s...", signature.String())
+	log.Printf("Fetching transaction details for %s...", signature.String())
 
-	// Obter detalhes completos da transação
+	// Get full transaction details
 	txResp, err := l.RPCClient.GetTransaction(context.Background(), signature, &rpc.GetTransactionOpts{
 		Commitment: rpc.CommitmentFinalized,
-		Encoding:   solana.EncodingJSONParsed, // Para obter detalhes de token
+		Encoding:   solana.EncodingJSONParsed, // To get token details
 	})
 	if err != nil {
-		log.Printf("Falha ao obter detalhes da transação %s: %v", signature.String(), err)
+		log.Printf("Failed to get transaction details for %s: %v", signature.String(), err)
 		return
 	}
 	if txResp == nil || txResp.Transaction == nil {
-		log.Printf("Detalhes da transação %s vazios.", signature.String())
+		log.Printf("Transaction details for %s are empty.", signature.String())
 		return
 	}
 
-	// Para buscar logs e transferências mais simples, em aplicações reais, usa-se sub.LogsSubscribe,
-	// e depois extrai-se a transação com GetTransaction como já feito.
+	// To fetch logs and simpler transfers, real applications use sub.LogsSubscribe,
+	// then extract the transaction with GetTransaction as already done.
 
-	log.Printf("Processamento avançado de parse de transação omitido na PoC para %s", signature.String())
+	log.Printf("Advanced transaction parse processing omitted in PoC for %s", signature.String())
 }
 
-// handleMintTo processa uma instrução MintTo.
+// handleMintTo processes a MintTo instruction.
 func (l *BlockchainListener) handleMintTo(signature solana.Signature, info interface{}) {
-	log.Println("Instrução 'mintTo' detectada.")
-	// O 'info' é um mapa de interface. Precisamos fazer o type assertion.
+	log.Println("'mintTo' instruction detected.")
+	// 'info' is an interface map. We need to do a type assertion.
 	infoMap, ok := info.(map[string]interface{})
 	if !ok {
-		log.Println("Falha ao converter info para mapa para 'mintTo'.")
+		log.Println("Failed to convert info to map for 'mintTo'.")
 		return
 	}
 
 	mint := infoMap["mint"].(string)
 	account := infoMap["account"].(string)
-	amountFloat, ok := infoMap["amount"].(float64) // Pode vir como float ou string
+	amountFloat, ok := infoMap["amount"].(float64) // May come as float or string
 	if !ok {
 		amountStr, ok := infoMap["amount"].(string)
 		if ok {
 			var err error
 			amountFloat, err = parseAmountFromString(amountStr)
 			if err != nil {
-				log.Printf("Falha ao parsear 'amount' de string para float: %v", err)
+				log.Printf("Failed to parse 'amount' from string to float: %v", err)
 				return
 			}
 		} else {
-			log.Println("Campo 'amount' em 'mintTo' não é float64 nem string.")
+			log.Println("'amount' field in 'mintTo' is neither float64 nor string.")
 			return
 		}
 	}
 
-	// Buscar o asset pelo mint_address para obter o asset.ID
+	// Find the asset by mint_address to get the asset.ID
 	asset, foundAsset, err := l.DB.GetAssetByMintAddress(mint)
 	if err != nil {
-		log.Printf("Erro ao buscar ativo por MintAddress %s: %v", mint, err)
+		log.Printf("Error fetching asset by MintAddress %s: %v", mint, err)
 		return
 	}
 	if !foundAsset {
-		log.Printf("Ativo para MintAddress %s não encontrado no DB interno. Ignorando.", mint)
+		log.Printf("Asset for MintAddress %s not found in internal DB. Skipping.", mint)
 		return
 	}
 
-	// Tentar encontrar o usuário dono da `account` (ATA)
+	// Try to find the user who owns the `account` (ATA)
 	ownerUser, foundUser, err := l.DB.GetUserBySolanaPubKey(infoMap["owner"].(string))
 	if err != nil {
-		log.Printf("Erro ao buscar proprietário por SolanaPubKey %s: %v", infoMap["owner"].(string), err)
+		log.Printf("Error fetching owner by SolanaPubKey %s: %v", infoMap["owner"].(string), err)
 		return
 	}
 	if !foundUser {
-		log.Printf("Usuário proprietário para ATA %s não encontrado no DB interno. Pode ser uma ATA de um usuário externo.", account)
-		// Você pode decidir criar um registro para usuários externos ou ignorar.
-		// Por simplicidade, vamos pular se o usuário não for interno.
+		log.Printf("Owner user for ATA %s not found in internal DB. May be an external user's ATA.", account)
+		// You can decide to create a record for external users or skip.
+		// For simplicity, skip if user is not internal.
 		return
 	}
 
-	// Idempotência: Verificar se já processamos esta transação
+	// Idempotency: Check if we have already processed this transaction
 	txExists, err := l.DB.TransactionExists(signature.String())
 	if err != nil {
-		log.Printf("Erro ao verificar idempotência da transação no banco: %v", err)
+		log.Printf("Error checking transaction idempotency in database: %v", err)
 		return
 	}
 	if txExists {
-		log.Printf("Transação %s já processada para MintTo. Ignorando.", signature.String())
+		log.Printf("Transaction %s already processed for MintTo. Skipping.", signature.String())
 		return
 	}
 
-	// Criar ou atualizar o registro de token para refletir o cunho
+	// Create or update the token record to reflect the mint
 	tokenID, _ := solana.NewRandomPrivateKey()
 	tokenRecord := models.Token{
-		ID:                  tokenID.PublicKey().String(), // ID aleatório para o registro interno
+		ID:                  tokenID.PublicKey().String(), // Random ID for the internal record
 		AssetID:             asset.ID,
 		OwnerID:             ownerUser.ID,
-		Amount:              amountFloat / 1e9, // Converter de volta de unidades atômicas (se 9 decimais)
+		Amount:              amountFloat / 1e9, // Convert back from atomic units (if 9 decimals)
 		SmartContractRules:  asset.Name + " rules",
 		IsTradable:          true,
 		MintAddress:         mint,
@@ -216,19 +216,19 @@ func (l *BlockchainListener) handleMintTo(signature solana.Signature, info inter
 		TransactionID:       signature.String(),
 		CreatedAt:           time.Now(),
 	}
-	if err := l.DB.SaveToken(tokenRecord); err != nil { // SaveToken faz ON CONFLICT UPDATE
-		log.Printf("Falha ao salvar/atualizar registro de token para MintTo %s: %v", signature.String(), err)
+	if err := l.DB.SaveToken(tokenRecord); err != nil { // SaveToken does ON CONFLICT UPDATE
+		log.Printf("Failed to save/update token record for MintTo %s: %v", signature.String(), err)
 	} else {
-		log.Printf("Token cunhado (mintTo) para Asset %s, OwnerID %s, Amount %f, TxID %s", asset.Symbol, ownerUser.ID, tokenRecord.Amount, signature.String())
+		log.Printf("Token minted (mintTo) for Asset %s, OwnerID %s, Amount %f, TxID %s", asset.Symbol, ownerUser.ID, tokenRecord.Amount, signature.String())
 	}
 }
 
-// handleTransfer processa uma instrução Transfer.
+// handleTransfer processes a Transfer instruction.
 func (l *BlockchainListener) handleTransfer(signature solana.Signature, info interface{}) {
-	log.Println("Instrução 'transfer' detectada.")
+	log.Println("'transfer' instruction detected.")
 	infoMap, ok := info.(map[string]interface{})
 	if !ok {
-		log.Println("Falha ao converter info para mapa para 'transfer'.")
+		log.Println("Failed to convert info to map for 'transfer'.")
 		return
 	}
 
@@ -240,116 +240,116 @@ func (l *BlockchainListener) handleTransfer(signature solana.Signature, info int
 			var err error
 			amountFloat, err = parseAmountFromString(amountStr)
 			if err != nil {
-				log.Printf("Falha ao parsear 'amount' de string para float: %v", err)
+				log.Printf("Failed to parse 'amount' from string to float: %v", err)
 				return
 			}
 		} else {
-			log.Println("Campo 'amount' em 'transfer' não é float64 nem string.")
+			log.Println("'amount' field in 'transfer' is neither float64 nor string.")
 			return
 		}
 	}
 
-	// Para uma transferência, precisaríamos identificar o MintAddress do token transferido.
-	// Isso pode ser obtido buscando a conta 'source' ou 'destination' e vendo seu 'mint'.
-	// Para simplificar, vamos assumir que a informação do mint está disponível via a conta de token.
+	// For a transfer, we would need to identify the MintAddress of the transferred token.
+	// This can be obtained by looking up the 'source' or 'destination' account and checking its 'mint'.
+	// For simplicity, assume mint info is available via the token account.
 	mintAddress := "MockMintAddress"
 
 	asset, foundAsset, err := l.DB.GetAssetByMintAddress(mintAddress)
 	if err != nil {
-		log.Printf("Erro ao buscar ativo por MintAddress %s: %v", mintAddress, err)
+		log.Printf("Error fetching asset by MintAddress %s: %v", mintAddress, err)
 		return
 	}
 	if !foundAsset {
-		log.Printf("Ativo para MintAddress %s não encontrado no DB interno. Ignorando transferência.", mintAddress)
+		log.Printf("Asset for MintAddress %s not found in internal DB. Skipping transfer.", mintAddress)
 		return
 	}
 
-	// Identificar remetente e destinatário no nosso DB
-	// Isso é um pouco complexo, pois GetTokenAccountsByOwner retorna ATAs, não diretamente usuários.
-	// A melhor forma é buscar o owner da ATA na própria Solana, e então mapear para nosso DB.
-	fromOwnerPubKey := infoMap["authority"].(string)      // Quem assinou a transação de transferência
-	toOwnerPubKey := infoMap["destinationOwner"].(string) // Quem é o owner da conta de destino
+	// Identify sender and recipient in our DB
+	// This is slightly complex since GetTokenAccountsByOwner returns ATAs, not users directly.
+	// The best approach is to fetch the ATA owner from Solana itself, then map to our DB.
+	fromOwnerPubKey := infoMap["authority"].(string)      // Who signed the transfer transaction
+	toOwnerPubKey := infoMap["destinationOwner"].(string) // Who owns the destination account
 
 	fromUser, foundFromUser, err := l.DB.GetUserBySolanaPubKey(fromOwnerPubKey)
 	if err != nil {
-		log.Printf("Erro ao buscar usuário remetente por SolanaPubKey %s: %v", fromOwnerPubKey, err)
+		log.Printf("Error fetching sender user by SolanaPubKey %s: %v", fromOwnerPubKey, err)
 		return
 	}
 	toUser, foundToUser, err := l.DB.GetUserBySolanaPubKey(toOwnerPubKey)
 	if err != nil {
-		log.Printf("Erro ao buscar usuário destinatário por SolanaPubKey %s: %v", toOwnerPubKey, err)
+		log.Printf("Error fetching recipient user by SolanaPubKey %s: %v", toOwnerPubKey, err)
 		return
 	}
 
 	if !foundFromUser || !foundToUser {
-		log.Printf("Remetente ou destinatário (ou ambos) não encontrados no DB interno para TxID %s. De %s para %s. Ignorando.",
+		log.Printf("Sender or recipient (or both) not found in internal DB for TxID %s. From %s to %s. Skipping.",
 			signature.String(), fromOwnerPubKey, toOwnerPubKey)
 		return
 	}
 
-	// Idempotência: Verificar se já processamos esta transação
+	// Idempotency: Check if we have already processed this transaction
 	txExists, err := l.DB.TransactionExists(signature.String())
 	if err != nil {
-		log.Printf("Erro ao verificar idempotência da transação no banco: %v", err)
+		log.Printf("Error checking transaction idempotency in database: %v", err)
 		return
 	}
 	if txExists {
-		log.Printf("Transação %s já processada para Transfer. Ignorando.", signature.String())
+		log.Printf("Transaction %s already processed for Transfer. Skipping.", signature.String())
 		return
 	}
 
-	// Agora que identificamos os usuários internos, podemos atualizar o banco de dados.
-	// Em um sistema real, você não "cria um novo token" para cada transferência.
-	// Você atualiza o saldo de tokens que um usuário possui.
-	// Para este exemplo, vamos simplificar a atualização dos registros.
+	// Now that we identified internal users, we can update the database.
+	// In a real system, you would not "create a new token" for every transfer.
+	// You would update the token balance a user holds.
+	// For this example, we simplify the record updates.
 
-	// Lógica para atualizar a posse:
-	// 1. Encontrar o registro de token "original" associado ao asset_id e fromUser.ID
-	//    e subtrair a quantidade.
-	// 2. Encontrar o registro de token "original" associado ao asset_id e toUser.ID
-	//    e adicionar a quantidade.
-	// Isso exigiria métodos no storage.DB para buscar e atualizar saldos por (AssetID, OwnerID).
+	// Ownership update logic:
+	// 1. Find the "original" token record associated with asset_id and fromUser.ID
+	//    and subtract the amount.
+	// 2. Find the "original" token record associated with asset_id and toUser.ID
+	//    and add the amount.
+	// This would require methods in storage.DB to fetch and update balances by (AssetID, OwnerID).
 
-	// Exemplo simplificado de como registrar a transferência para fins de histórico interno:
-	// Cria um novo registro de token que representa a transferência para o novo proprietário.
-	// Em produção, a lógica seria mais complexa para gerenciar saldos por usuário/ativo.
+	// Simplified example of how to record the transfer for internal history purposes:
+	// Creates a new token record representing the transfer to the new owner.
+	// In production, the logic would be more complex to manage balances per user/asset.
 	tokenID, _ := solana.NewRandomPrivateKey()
 	transferredTokenRecord := models.Token{
 		ID:                  tokenID.PublicKey().String(),
 		AssetID:             asset.ID,
-		OwnerID:             toUser.ID, // O novo proprietário
+		OwnerID:             toUser.ID, // The new owner
 		Amount:              amountFloat / 1e9,
-		SmartContractRules:  "Transferido via blockchain",
+		SmartContractRules:  "Transferred via blockchain",
 		IsTradable:          true,
 		MintAddress:         mintAddress,
-		TokenAccountAddress: destination, // A conta de destino
+		TokenAccountAddress: destination, // The destination account
 		TransactionID:       signature.String(),
 		CreatedAt:           time.Now(),
 	}
 
 	if err := l.DB.SaveToken(transferredTokenRecord); err != nil {
-		log.Printf("Falha ao salvar registro de token para Transferência %s: %v", signature.String(), err)
+		log.Printf("Failed to save token record for Transfer %s: %v", signature.String(), err)
 	} else {
-		log.Printf("Token transferido (transfer) de %s para %s. Asset: %s, Amount: %f, TxID: %s",
+		log.Printf("Token transferred (transfer) from %s to %s. Asset: %s, Amount: %f, TxID: %s",
 			fromUser.ID, toUser.ID, asset.Symbol, transferredTokenRecord.Amount, signature.String())
 	}
 }
 
-// parseAmountFromString tenta parsear um valor de string para float64.
-// Útil porque o campo 'amount' pode vir como string em algumas instruções RPC.
+// parseAmountFromString attempts to parse a string value to float64.
+// Useful because the 'amount' field may come as a string in some RPC instructions.
 func parseAmountFromString(s string) (float64, error) {
 	var f big.Float
 	_, _, err := f.Parse(s, 10)
 	if err != nil {
-		return 0, fmt.Errorf("falha ao parsear string para float: %w", err)
+		return 0, fmt.Errorf("failed to parse string to float: %w", err)
 	}
 	val, _ := f.Float64()
 	return val, nil
 }
 
-// ... Outras funções auxiliares se necessário ...
+// ... Other helper functions if needed ...
 
-// Para o parserAmountFromString
+// For parseAmountFromString
 //import (
 //    "math/big"
 //)

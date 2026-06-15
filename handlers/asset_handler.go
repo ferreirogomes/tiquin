@@ -9,17 +9,17 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// AssetHandler lida com requisições HTTP relacionadas a ativos.
+// AssetHandler handles HTTP requests related to assets.
 type AssetHandler struct {
 	Service *services.TokenizationService
 }
 
-// NewAssetHandler cria uma nova instância do handler de ativos.
+// NewAssetHandler creates a new asset handler instance.
 func NewAssetHandler(s *services.TokenizationService) *AssetHandler {
 	return &AssetHandler{Service: s}
 }
 
-// CreateAsset cria um novo ativo.
+// CreateAsset creates a new asset.
 // POST /assets
 func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
@@ -44,22 +44,22 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(asset)
 }
 
-// GetAssetByID obtém um ativo pelo ID.
+// GetAssetByID retrieves an asset by ID.
 // GET /assets/{id}
 func (h *AssetHandler) GetAssetByID(w http.ResponseWriter, r *http.Request) {
 	assetID := chi.URLParam(r, "id")
 	if assetID == "" {
-		http.Error(w, "ID do ativo é obrigatório", http.StatusBadRequest)
+		http.Error(w, "Asset ID is required", http.StatusBadRequest)
 		return
 	}
 
 	asset, found, err := h.Service.DB.GetAsset(assetID)
 	if err != nil {
-		http.Error(w, "Erro ao buscar ativo", http.StatusInternalServerError)
+		http.Error(w, "Error fetching asset", http.StatusInternalServerError)
 		return
 	}
 	if !found {
-		http.Error(w, "Ativo não encontrado", http.StatusNotFound)
+		http.Error(w, "Asset not found", http.StatusNotFound)
 		return
 	}
 

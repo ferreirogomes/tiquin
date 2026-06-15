@@ -14,19 +14,19 @@ import (
 	"github.com/google/uuid"
 )
 
-// UserHandler lida com requisições HTTP relacionadas a usuários.
+// UserHandler handles HTTP requests related to users.
 type UserHandler struct {
 	DB      *storage.DB
 	SolanaS *services.SolanaIntegrationService
 	TokenS  *services.TokenizationService
 }
 
-// NewUserHandler cria uma nova instância do handler de usuários.
+// NewUserHandler creates a new user handler instance.
 func NewUserHandler(db *storage.DB, solanaS *services.SolanaIntegrationService, tokenS *services.TokenizationService) *UserHandler {
 	return &UserHandler{DB: db, SolanaS: solanaS, TokenS: tokenS}
 }
 
-// CreateUser cria um novo usuário.
+// CreateUser creates a new user.
 // POST /users
 func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
@@ -41,18 +41,18 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if requestBody.SolanaPubKey == "" {
-		http.Error(w, "solana_pub_key é obrigatória no padrão Web3", http.StatusBadRequest)
+		http.Error(w, "solana_pub_key is required in Web3 standard", http.StatusBadRequest)
 		return
 	}
 
 	// Verificar se usuário já existe
 	existingUser, found, err := h.DB.GetUserBySolanaPubKey(requestBody.SolanaPubKey)
 	if err != nil {
-		http.Error(w, "Erro ao verificar usuário existente", http.StatusInternalServerError)
+		http.Error(w, "Error checking existing user", http.StatusInternalServerError)
 		return
 	}
 	if found {
-		// No Web3 "Login" é conectar a carteira. Se já existe, retorna o usuário existente.
+		// In Web3, "Login" means connecting the wallet. If already exists, return the existing user.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(existingUser)
@@ -69,7 +69,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	err = h.DB.SaveUser(user)
 	if err != nil {
-		http.Error(w, "Erro ao salvar usuário no banco de dados", http.StatusInternalServerError)
+		http.Error(w, "Error saving user to database", http.StatusInternalServerError)
 		return
 	}
 
@@ -78,22 +78,22 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
-// GetUserByID obtém um usuário pelo ID.
+// GetUserByID retrieves a user by ID.
 // GET /users/{id}
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "id")
 	if userID == "" {
-		http.Error(w, "ID do usuário é obrigatório", http.StatusBadRequest)
+		http.Error(w, "User ID is required", http.StatusBadRequest)
 		return
 	}
 
 	user, found, err := h.DB.GetUser(userID)
 	if err != nil {
-		http.Error(w, "Erro ao buscar usuário", http.StatusInternalServerError)
+		http.Error(w, "Error fetching user", http.StatusInternalServerError)
 		return
 	}
 	if !found {
-		http.Error(w, "Usuário não encontrado", http.StatusNotFound)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
@@ -101,22 +101,22 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
-// GetUserTokens obtém todos os tokens de um usuário.
+// GetUserTokens retrieves all tokens for a user.
 // GET /users/{id}/tokens
 func (h *UserHandler) GetUserTokens(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "id")
 	if userID == "" {
-		http.Error(w, "ID do usuário é obrigatório", http.StatusBadRequest)
+		http.Error(w, "User ID is required", http.StatusBadRequest)
 		return
 	}
 
 	tokens, err := h.DB.GetTokensByOwnerID(userID)
 	if err != nil {
-		http.Error(w, "Erro ao buscar tokens", http.StatusInternalServerError)
+		http.Error(w, "Error fetching tokens", http.StatusInternalServerError)
 		return
 	}
 	if len(tokens) == 0 {
-		// Retornar array vazio em invés de erro NotFound para padrão de listagens
+		// Return empty array instead of NotFound error for listing patterns
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode([]models.Token{})
 		return

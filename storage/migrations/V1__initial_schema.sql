@@ -1,9 +1,9 @@
 -- V1__initial_schema.sql
 
--- Criação da extensão pgcrypto para gen_random_uuid()
+-- Creation of pgcrypto extension for gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Tabela de usuários
+-- Users table
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
@@ -12,17 +12,17 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela de ativos
+-- Assets table
 CREATE TABLE IF NOT EXISTS assets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     symbol VARCHAR(10) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     total_shares NUMERIC(20, 9) NOT NULL,
-    mint_address VARCHAR(64) UNIQUE, -- Pode ser NULL até a tokenização
+    mint_address VARCHAR(64) UNIQUE, -- Can be NULL until tokenization
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela de tokens (registros internos do que foi tokenizado/transferido)
+-- Tokens table (internal records of what was tokenized/transferred)
 CREATE TABLE IF NOT EXISTS tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id),
@@ -32,11 +32,11 @@ CREATE TABLE IF NOT EXISTS tokens (
     is_tradable BOOLEAN DEFAULT TRUE,
     mint_address VARCHAR(64) NOT NULL,
     token_account_address VARCHAR(64) NOT NULL,
-    transaction_id VARCHAR(100) NOT NULL, -- Signature da transação Solana
+    transaction_id VARCHAR(100) NOT NULL, -- Solana transaction signature
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Índices para otimização de consultas
+-- Indexes for query optimization
 CREATE INDEX IF NOT EXISTS idx_tokens_asset_owner ON tokens (asset_id, owner_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_owner_id ON tokens (owner_id);
 CREATE INDEX IF NOT EXISTS idx_assets_mint_address ON assets (mint_address);
