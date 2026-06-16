@@ -10,8 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ferreirogomes/tiquin/blockchain_listener" // Import the listener
+	"github.com/ferreirogomes/tiquin/blockchain_listener"
 	"github.com/ferreirogomes/tiquin/handlers"
+	apimiddleware "github.com/ferreirogomes/tiquin/middleware"
 	"github.com/ferreirogomes/tiquin/services"
 	"github.com/ferreirogomes/tiquin/storage"
 
@@ -20,12 +21,9 @@ import (
 )
 
 func main() {
-	// Load configuration (Assuming these are loaded from env vars or config file)
 	dataSourceName := os.Getenv("DB_CONNECTION_STRING")
 	solanaRPCURL := os.Getenv("SOLANA_RPC_URL")
 	solanaFeePayerPrivateKey := os.Getenv("SOLANA_FEE_PAYER_PRIVATE_KEY")
-
-	// ... (DB and Solana configuration as before) ...
 
 	db, err := storage.NewDB(dataSourceName)
 	if err != nil {
@@ -34,7 +32,6 @@ func main() {
 	defer db.Close()
 
 	solanaIntegrationService := services.NewSolanaIntegrationService(solanaRPCURL, solanaFeePayerPrivateKey)
-
 	tokenizationService := services.NewTokenizationService(db, solanaIntegrationService)
 
 	assetHandler := handlers.NewAssetHandler(tokenizationService)
@@ -51,14 +48,18 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.URLFormat)
 
+	// P4: Apply API key authentication to all routes
+	authMiddleware := apimiddleware.APIKeyAuth(db.DB)
+	r.Use(authMiddleware)
+
 	r.Route("/assets", func(r chi.Router) {
 		r.Post("/", assetHandler.CreateAsset)
 		r.Get("/{id}", assetHandler.GetAssetByID)
 	})
 
 	r.Route("/tokens", func(r chi.Router) {
-		r.Post("/transfer/prepare", tokenHandler.PrepareTransfer)   // New route to prepare
-		r.Post("/transfer/complete", tokenHandler.CompleteTransfer) // New route to complete
+		r.Post("/transfer/prepare", tokenHandler.PrepareTransfer)
+		r.Post("/transfer/complete", tokenHandler.CompleteTransfer)
 		r.Get("/{id}", tokenHandler.GetTokenByID)
 		r.Get("/by-asset/{assetID}", tokenHandler.GetTokensByAssetID)
 	})
@@ -80,8 +81,11 @@ func main() {
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-sig
-		// Shutdown signal with grace period of 30 seconds
-		shutdownCtx, _ := context.WithTimeout(serverCtx, 30*time.Second)
+
+		// QW1 fix: properly capture and defer the cancel function
+		shutdownCtx, cancel := context.WithTimeout(serverCtx, 30*time.Second)
+		defer cancel()
+
 		go func() {
 			<-shutdownCtx.Done()
 			if shutdownCtx.Err() == context.DeadlineExceeded {
@@ -89,7 +93,11 @@ func main() {
 			}
 		}()
 
-		// Trigger graceful shutdown
+		// QW3: Stop the blockchain listener gracefully before server shuts down
+		log.Println("Stopping blockchain listener...")
+		listener.Stop()
+
+		// Trigger graceful HTTP server shutdown
 		err := server.Shutdown(shutdownCtx)
 		if err != nil {
 			log.Fatal(err)

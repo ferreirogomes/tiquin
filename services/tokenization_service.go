@@ -26,14 +26,26 @@ func NewTokenizationService(db *storage.DB, solanaS *SolanaIntegrationService) *
 	}
 }
 
-func (s *TokenizationService) CreateAsset(symbol, name string, totalShares float64) (models.Asset, error) {
+// CreateAsset creates an asset record in the DB AND mints it on Solana.
+func (s *TokenizationService) CreateAsset(symbol, name string, totalShares float64, ownerPubKey string) (models.Asset, error) {
+	ownerKey, err := solana.PublicKeyFromBase58(ownerPubKey)
+	if err != nil {
+		return models.Asset{}, fmt.Errorf("invalid owner public key: %w", err)
+	}
+
+	mintAddress, _, err := s.SolanaS.CreateMintAndTokenAccount(ownerKey, symbol)
+	if err != nil {
+		return models.Asset{}, fmt.Errorf("failed to create mint on Solana: %w", err)
+	}
+
 	asset := models.Asset{
 		ID:          uuid.New().String(),
 		Symbol:      symbol,
 		Name:        name,
 		TotalShares: totalShares,
+		MintAddress: mintAddress.String(),
 	}
-	err := s.DB.SaveAsset(asset)
+	err = s.DB.SaveAsset(asset)
 	return asset, err
 }
 
@@ -89,31 +101,23 @@ func (s *TokenizationService) PrepareTransferTokenFromUser(
 		return "", solana.PublicKey{}, fmt.Errorf("failed to find recipient ATA: %w", err)
 	}
 
-	// Check if the destination ATA exists. If not, it will need to be created.
-	// In a real system, you may have a separate `CreateAssociatedTokenAccount` instruction,
-	// or include that instruction in the same transaction as the transfer.
-	// For simplicity, assume that if the ATA does not exist, it will be created when the first transfer is received.
-	// Or, we can check and add the creation instruction if needed.
-	_, err = s.SolanaS.RPCClient.GetAccountInfo(context.Background(), toATA)
-	if err != nil && err.Error() == "account not found" {
-		// ATA does not exist; include instruction to create it in the transaction
-		log.Printf("Destination ATA %s not found. Including instruction to create it.", toATA.String())
-		// Here you would need to build the CreateAssociatedTokenAccount instruction
-		// and include it in the transaction being prepared.
-		// This would make PrepareTransferTransaction more complex, as it would need to accept multiple instructions.
-		// For simplicity in this example, assume the frontend or a separate process
-		// ensures the destination ATA exists.
-		// For a complete solution, consider adding this logic to SolanaIntegrationService.
-		// Or the frontend can attempt to create the ATA before requesting the transfer.
+	// Ensure destination ATA exists; create it if not (FeePayer covers the cost)
+	created, err := s.SolanaS.EnsureATAExists(toUserPubKey, mintAddress, toATA)
+	if err != nil {
+		return "", solana.PublicKey{}, fmt.Errorf("failed to ensure destination ATA exists: %w", err)
+	}
+	if created {
+		log.Printf("Created destination ATA %s for user %s", toATA, toUserID)
 	}
 
+	// P1 fix: real balance check from Solana
 	currentBalance, err := s.SolanaS.GetTokenAccountBalance(fromATA)
 	if err != nil {
 		return "", solana.PublicKey{}, fmt.Errorf("failed to check sender balance on Solana: %w", err)
 	}
 	amountAtomic := uint64(amount * 1e9)
 	if currentBalance < amountAtomic {
-		return "", solana.PublicKey{}, errors.New("insufficient balance for transfer on Solana")
+		return "", solana.PublicKey{}, fmt.Errorf("insufficient balance: have %d, need %d atomic units", currentBalance, amountAtomic)
 	}
 
 	// Prepare the transaction, but do not sign with the user's key
@@ -125,13 +129,13 @@ func (s *TokenizationService) PrepareTransferTokenFromUser(
 	return serializedTx, toATA, nil
 }
 
-// CompleteTransferTokenFromUser receives the signed transaction and sends it to Solana.
-// This is the method that the final transfer endpoint will call.
+// CompleteTransferTokenFromUser receives the signed transaction, sends it to Solana,
+// and updates the internal DB: debits the sender and credits the recipient.
 func (s *TokenizationService) CompleteTransferTokenFromUser(
 	assetID, fromUserID, toUserID string, amount float64, signedTxBase64 string,
 	destinationATA solana.PublicKey, // Receives the destination ATA back from the handler
 ) (models.Token, error) {
-	_, foundFrom, err := s.DB.GetUser(fromUserID)
+	fromUser, foundFrom, err := s.DB.GetUser(fromUserID)
 	if err != nil {
 		return models.Token{}, fmt.Errorf("error fetching sender user: %w", err)
 	}
@@ -154,15 +158,23 @@ func (s *TokenizationService) CompleteTransferTokenFromUser(
 		return models.Token{}, errors.New("asset not found or not tokenized")
 	}
 
-	// Envia a transação assinada para a rede Solana
+	// Send the signed transaction to Solana
 	txID, err := s.SolanaS.SendSignedTransaction(signedTxBase64)
 	if err != nil {
 		return models.Token{}, fmt.Errorf("failed to send signed transaction to Solana: %w", err)
 	}
 
-	// WARNING: The internal token record here is for tracking purposes only.
-	// The source of truth is the blockchain. The listener will handle keeping things in sync.
-	transferredToken := models.Token{
+	// P3 fix: Debit sender and credit recipient in the DB
+	// Use a DB transaction to keep both operations atomic
+	if err := s.DB.TransferTokenBalance(fromUser.ID, toUser.ID, asset.ID, amount, txID.String(), destinationATA.String()); err != nil {
+		// This is a serious error: the transaction went to the blockchain, but the internal DB failed.
+		// The blockchain listener will eventually reconcile via backfill.
+		log.Printf("ERROR: Solana tx %s sent, but DB transfer failed: %v", txID, err)
+		return models.Token{}, fmt.Errorf("transaction sent but failed to update internal records: %w", err)
+	}
+
+	// Return the new recipient's token record
+	recipientToken := models.Token{
 		ID:                  uuid.New().String(),
 		AssetID:             asset.ID,
 		OwnerID:             toUser.ID,
@@ -174,15 +186,56 @@ func (s *TokenizationService) CompleteTransferTokenFromUser(
 		TokenAccountAddress: destinationATA.String(),
 		TransactionID:       txID.String(),
 	}
-	if err := s.DB.SaveToken(transferredToken); err != nil {
-		// This is a serious error: the transaction went to the blockchain, but the internal DB failed.
-		// In a real application, you would need a robust reconciliation mechanism here.
-		log.Printf("ERROR: Solana transaction %s sent, but failed to save internal record: %v", txID.String(), err)
-		return models.Token{}, fmt.Errorf("transaction sent but failed to register internally: %w", err)
+
+	return recipientToken, nil
+}
+
+// MintInitialTokens mints the initial total supply of an asset to the owner's ATA.
+func (s *TokenizationService) MintInitialTokens(asset models.Asset, ownerPubKey string) (models.Token, error) {
+	ownerKey, err := solana.PublicKeyFromBase58(ownerPubKey)
+	if err != nil {
+		return models.Token{}, fmt.Errorf("invalid owner public key: %w", err)
 	}
 
-	return transferredToken, nil
+	mintAddress, err := solana.PublicKeyFromBase58(asset.MintAddress)
+	if err != nil {
+		return models.Token{}, fmt.Errorf("invalid mint address: %w", err)
+	}
+
+	ownerATA, _, err := solana.FindAssociatedTokenAddress(ownerKey, mintAddress)
+	if err != nil {
+		return models.Token{}, fmt.Errorf("failed to derive owner ATA: %w", err)
+	}
+
+	amountAtomic := uint64(asset.TotalShares * 1e9)
+	sig, err := s.SolanaS.MintTokensToAccount(mintAddress, ownerATA, amountAtomic)
+	if err != nil {
+		return models.Token{}, fmt.Errorf("failed to mint tokens: %w", err)
+	}
+
+	// Use context.Background() for DB operations — no external context needed here
+	_ = context.Background()
+
+	tokenRecord := models.Token{
+		ID:                  uuid.New().String(),
+		AssetID:             asset.ID,
+		OwnerID:             ownerPubKey, // Store pubkey as owner reference before user lookup
+		Amount:              asset.TotalShares,
+		SmartContractRules:  asset.Name + " rules",
+		IsTradable:          true,
+		MintAddress:         asset.MintAddress,
+		TokenAccountAddress: ownerATA.String(),
+		TransactionID:       sig.String(),
+		CreatedAt:           time.Now(),
+	}
+
+	if err := s.DB.SaveToken(tokenRecord); err != nil {
+		log.Printf("WARNING: minted %d tokens (tx %s) but failed to save record: %v", amountAtomic, sig, err)
+	}
+
+	return tokenRecord, nil
 }
+
 func (s *TokenizationService) GetUserTokensFromSolana(userID string) ([]models.Token, error) {
-	return []models.Token{}, nil
+	return s.DB.GetTokensByOwnerID(userID)
 }

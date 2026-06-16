@@ -19,13 +19,14 @@ func NewAssetHandler(s *services.TokenizationService) *AssetHandler {
 	return &AssetHandler{Service: s}
 }
 
-// CreateAsset creates a new asset.
+// CreateAsset creates a new asset and mints it on Solana.
 // POST /assets
 func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
-		Symbol      string  `json:"symbol"`
-		Name        string  `json:"name"`
-		TotalShares float64 `json:"total_shares"`
+		Symbol             string  `json:"symbol"`
+		Name               string  `json:"name"`
+		TotalShares        float64 `json:"total_shares"`
+		OwnerSolanaPubKey  string  `json:"owner_solana_pub_key"` // The initial token owner's public key
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
@@ -33,7 +34,12 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	asset, err := h.Service.CreateAsset(requestBody.Symbol, requestBody.Name, requestBody.TotalShares)
+	if requestBody.OwnerSolanaPubKey == "" {
+		http.Error(w, "owner_solana_pub_key is required to create an on-chain mint", http.StatusBadRequest)
+		return
+	}
+
+	asset, err := h.Service.CreateAsset(requestBody.Symbol, requestBody.Name, requestBody.TotalShares, requestBody.OwnerSolanaPubKey)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -43,6 +49,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(asset)
 }
+
 
 // GetAssetByID retrieves an asset by ID.
 // GET /assets/{id}

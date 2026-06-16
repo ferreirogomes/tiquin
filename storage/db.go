@@ -193,3 +193,50 @@ func (d *DB) UpdateToken(token models.Token) error {
 	}
 	return nil
 }
+
+// TransferTokenBalance atomically debits the sender's token balance and credits the recipient.
+// It uses a DB transaction to ensure consistency.
+func (d *DB) TransferTokenBalance(fromOwnerID, toOwnerID, assetID string, amount float64, txID, toATA string) error {
+	tx, err := d.Beginx()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	// Debit sender: subtract amount from their existing token record for this asset
+	debitResult, err := tx.Exec(
+		`UPDATE tokens SET amount = amount - $1
+		 WHERE owner_id = $2 AND asset_id = $3 AND is_tradable = true AND amount >= $1
+		 LIMIT 1`,
+		amount, fromOwnerID, assetID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to debit sender: %w", err)
+	}
+	rowsAffected, _ := debitResult.RowsAffected()
+	if rowsAffected == 0 {
+		err = fmt.Errorf("sender has insufficient balance or no token record for asset %s", assetID)
+		return err
+	}
+
+	// Credit recipient: upsert a token record for the recipient
+	_, err = tx.Exec(
+		`INSERT INTO tokens (id, asset_id, owner_id, amount, smart_contract_rules, is_tradable,
+		                     mint_address, token_account_address, transaction_id, created_at)
+		 SELECT gen_random_uuid(), asset_id, $1, $2, smart_contract_rules, is_tradable,
+		        mint_address, $3, $4, NOW()
+		 FROM tokens WHERE asset_id = $5 LIMIT 1
+		 ON CONFLICT (transaction_id) DO NOTHING`,
+		toOwnerID, amount, toATA, txID, assetID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to credit recipient: %w", err)
+	}
+
+	return tx.Commit()
+}
+
